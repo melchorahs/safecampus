@@ -321,6 +321,72 @@
     .mb-menu { width:40px; height:40px; border-radius:50%; border:1px solid var(--line); background:var(--fill); color:var(--ink); display:inline-flex; align-items:center; justify-content:center; padding:0; cursor:pointer; }
     .mb-report { margin-left:auto; display:inline-flex; align-items:center; min-height:40px; padding:0 16px; border-radius:999px; background:var(--accent-fill); color:#fff; font-weight:700; font-size:.88rem; text-decoration:none; }
   }
+
+  /* Desktop cursor follower effect */
+  .sc-cursor-ring,
+  .sc-cursor-dot {
+    position: fixed;
+    top: 0;
+    left: 0;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 99999;
+    opacity: 0;
+    will-change: transform;
+  }
+  .sc-cursor-ring {
+    width: 32px;
+    height: 32px;
+    border: 1.5px solid #142b4f;
+    background: rgba(184, 217, 87, .08);
+    box-shadow: 0 0 16px rgba(20, 43, 79, .16);
+    transition: width .2s ease, height .2s ease, background .2s ease, opacity .15s ease;
+  }
+  .sc-cursor-dot {
+    width: 7px;
+    height: 7px;
+    background: #b8d957;
+    box-shadow: 0 0 10px rgba(184, 217, 87, .8);
+  }
+  html[data-theme="dark"] .sc-cursor-ring {
+    background: rgba(184, 217, 87, .08);
+    box-shadow: 0 0 16px rgba(20, 43, 79, .22);
+  }
+  html[data-theme="dark"] .sc-cursor-dot {
+    box-shadow: 0 0 10px rgba(184, 217, 87, .8);
+  }
+  body.sc-cursor-active .sc-cursor-ring,
+  body.sc-cursor-active .sc-cursor-dot {
+    opacity: 1;
+  }
+  body.sc-cursor-hover .sc-cursor-ring {
+    width: 42px;
+    height: 42px;
+    background: rgba(184, 217, 87, .14);
+  }
+  html[data-theme="dark"] body.sc-cursor-hover .sc-cursor-ring {
+    background: rgba(184, 217, 87, .14);
+  }
+  .sc-cursor-ring.sc-cursor-click {
+    animation: scCursorRipple .38s ease-out;
+  }
+  @keyframes scCursorRipple {
+    0% { box-shadow: 0 0 0 0 rgba(20, 43, 79, .32); }
+    100% { box-shadow: 0 0 0 18px rgba(20, 43, 79, 0); }
+  }
+  html.calm .sc-cursor-ring,
+  html.calm .sc-cursor-dot {
+    display: none !important;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .sc-cursor-ring,
+    .sc-cursor-dot { display: block; }
+  }
+  @media (hover: none), (pointer: coarse), (prefers-reduced-motion: reduce) {
+    .sc-cursor-ring,
+    .sc-cursor-dot { display: none !important; }
+  }
+
 </style>
 </head>
 <body>
@@ -1565,5 +1631,85 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape'&&menu.classL
 apply();
 })();
 </script>
+
+<div class="sc-cursor-ring" aria-hidden="true"></div>
+<div class="sc-cursor-dot" aria-hidden="true"></div>
+
+<script>
+/* Desktop-only custom cursor follower */
+(function () {
+  var ring = document.querySelector('.sc-cursor-ring');
+  var dot = document.querySelector('.sc-cursor-dot');
+  if (!ring || !dot) return;
+
+  var desktopMouse = window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)');
+  var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
+  if (!desktopMouse || !desktopMouse.matches || (reducedMotion && reducedMotion.matches)) return;
+
+  var mouseX = 0;
+  var mouseY = 0;
+  var ringX = 0;
+  var ringY = 0;
+  var frame = null;
+  var hasPosition = false;
+
+  function animateRing() {
+    ringX += (mouseX - ringX) * 0.18;
+    ringY += (mouseY - ringY) * 0.18;
+    ring.style.transform = 'translate3d(' + ringX + 'px,' + ringY + 'px,0) translate(-50%,-50%)';
+
+    if (Math.abs(mouseX - ringX) > 0.2 || Math.abs(mouseY - ringY) > 0.2) {
+      frame = requestAnimationFrame(animateRing);
+    } else {
+      frame = null;
+    }
+  }
+
+  function handlePointerMove(event) {
+    if (document.documentElement.classList.contains('calm')) return;
+
+    mouseX = event.clientX;
+    mouseY = event.clientY;
+    dot.style.transform = 'translate3d(' + mouseX + 'px,' + mouseY + 'px,0) translate(-50%,-50%)';
+
+    if (!hasPosition) {
+      ringX = mouseX;
+      ringY = mouseY;
+      hasPosition = true;
+      ring.style.transform = 'translate3d(' + ringX + 'px,' + ringY + 'px,0) translate(-50%,-50%)';
+    }
+
+    document.body.classList.add('sc-cursor-active');
+    if (frame === null) frame = requestAnimationFrame(animateRing);
+  }
+
+  function clearCursor() {
+    document.body.classList.remove('sc-cursor-active', 'sc-cursor-hover');
+  }
+
+  document.addEventListener('pointermove', handlePointerMove, { passive: true });
+
+  document.addEventListener('pointerover', function (event) {
+    if (!(event.target instanceof Element)) return;
+    var interactive = event.target.closest('a, button, input, select, textarea, [role="button"]');
+    document.body.classList.toggle('sc-cursor-hover', !!interactive);
+  });
+
+  document.addEventListener('pointerdown', function () {
+    if (document.documentElement.classList.contains('calm')) return;
+    ring.classList.remove('sc-cursor-click');
+    void ring.offsetWidth;
+    ring.classList.add('sc-cursor-click');
+  });
+
+  ring.addEventListener('animationend', function () {
+    ring.classList.remove('sc-cursor-click');
+  });
+
+  document.addEventListener('pointerleave', clearCursor);
+  window.addEventListener('blur', clearCursor);
+})();
+</script>
+
 </body>
 </html>
